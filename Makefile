@@ -16,6 +16,7 @@ build: bins
 	docker-compose build
 
 dev: build
+	docker-compose build
 	docker-compose up
 
 setup:
