@@ -26,7 +26,7 @@ node:
 
 static_resources:
   clusters:
-    - connect_timeout: 1s
+    - connect_timeout: 0.250s
       http2_protocol_options: {}
       load_assignment:
         cluster_name: xds
@@ -54,12 +54,12 @@ static_resources:
                         listener=ingress start_time=%START_TIME%
                         req_method=%REQ(:METHOD)% req_path=%REQ(:PATH)% protocol=%PROTOCOL%
                         response_code=%RESPONSE_CODE% response_flags=%RESPONSE_FLAGS%
-                        bytes_reveived=%BYTES_RECEIVED% bytes_sent=%BYTES_SENT% duration=%DURATION%
+                        bytes_received=%BYTES_RECEIVED% bytes_sent=%BYTES_SENT% duration=%DURATION%
                         resp_x_envoy_upstream_service_time=%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%
                         req_x_envoy_original_path=%REQ(X-ENVOY-ORIGINAL-PATH)% req_x_forwarded_for=%REQ(X-FORWARDED-FOR)%
-                        req_user_agent="%REQ(USER-AGENT)%" req_x_request_id=%REQ(X-REQUEST-ID)%
+                        req_user_agent="%REQ(USER-AGENT)%" req_x_request_id=%REQ(X-REQUEST-ID)% req_uber_trace_id=%REQ(UBER-TRACE-ID)%
                         req_authority=%REQ(:AUTHORITY)% upstream_host=%UPSTREAM_HOST% upstream_cluster=%UPSTREAM_CLUSTER%
-                        resp_grpc_status=%RESP(grpc-status) %resp_grpc_message="%RESP(grpc-message)%"
+                        resp_grpc_status=%RESP(grpc-status)% %resp_grpc_message="%RESP(grpc-message)%"
                         trailer_grpc_status=%TRAILER(grpc-status)% trailer_grpc_message="%TRAILER(grpc-message)%"
                       path: /dev/stdout
                     name: envoy.file_access_log
@@ -78,6 +78,7 @@ static_resources:
                       grpc_service:
                         envoy_grpc:
                           cluster_name: auth-v2alpha-sidecar
+                        timeout: 0.5s
                     name: envoy.ext_authz
                   - name: envoy.grpc_web
                   - config:
@@ -98,6 +99,7 @@ static_resources:
                       services:
                         - gomesh.widgets.v2.Widgets
                     name: envoy.grpc_json_transcoder
+                  - name: envoy.grpc_http1_bridge
                   - name: envoy.router
                 route_config:
                   name: local
@@ -134,6 +136,17 @@ static_resources:
                   operation_name: ingress
               name: envoy.http_connection_manager
       name: ingress
+
+stats_config:
+  stats_tags:
+    - regex: '^cluster(?=\.).*?\.grpc(-(.*?))\.'                          # web
+      tag_name: envoy.grpc_format
+    - regex: '^cluster(?=\.).*?\.grpc(?:-web)?\.((.*)\.(?:.*)\.)'         # myservice.widgets.v0.Widgets (greedy)
+      tag_name: envoy.grpc_service
+    - regex: '^cluster(?=\.).*?\.grpc(?:-web)?\.((?:.*)\.(.*)\.)'         # Get
+      tag_name: envoy.grpc_method
+    - regex: '^cluster(?=\.).*?\.grpc(?:-web)?(\.(?:.*)\.(?:.*)\.(\d+))'  # 0 (and remove leading dot)
+      tag_name: envoy.grpc_code
 
 tracing:
   http:
